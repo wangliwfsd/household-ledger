@@ -23,7 +23,12 @@ function isSameOrigin(request: NextRequest) {
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin = request.headers.get("origin");
   if (!origin) return true;
-  try { return new URL(origin).host === request.nextUrl.host; } catch { return false; }
+  try {
+    const originHost = new URL(origin).host.toLowerCase();
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim().toLowerCase();
+    const host = request.headers.get("host")?.trim().toLowerCase();
+    return [forwardedHost, host, request.nextUrl.host.toLowerCase()].some(candidate => candidate === originHost);
+  } catch { return false; }
 }
 
 export async function POST(request: NextRequest) {
