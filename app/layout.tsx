@@ -6,6 +6,8 @@ import "./dashboard.css";
 import "./mobile-nav.css";
 import "./month-note.css";
 import "./danger.css";
+import "./login/login.css";
+import "./auth.css";
 
 export const metadata: Metadata = {
   title: "家衡｜家庭资产账本",

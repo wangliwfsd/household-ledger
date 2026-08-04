@@ -30,12 +30,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /outputs/
@@ -49,5 +51,6 @@ next-env.d.ts
 *.csv
 *.dump
 *.backup
+*.sql.gz
 *-backup.sql
 pre-*.sql

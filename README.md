@@ -14,7 +14,7 @@
 - “消费分期”账户自动同步未结清分期的剩余应付款
 - 房贷 Offset、还款增长率和逐月还款测算
 - Excel 可打开的 UTF-8 CSV 导出
-- Docker Compose 部署、Basic Auth 登录保护
+- Docker Compose 部署、自定义登录页与安全持久会话
 
 ## 数据规则
 
@@ -42,8 +42,24 @@ cp .env.example .env
 ```dotenv
 POSTGRES_PASSWORD=请设置高强度数据库密码
 APP_USERNAME=family
-APP_PASSWORD=请设置高强度登录密码
+APP_PASSWORD_HASH='$2b$12$这里填写生成的bcrypt哈希'
+SESSION_SECRET=这里填写至少32个随机字符的会话密钥
+AUTH_COOKIE_SECURE=true
 ```
+
+登录密码不能明文写入 `.env`。先在已安装依赖的项目目录运行：
+
+```bash
+npm run auth:hash-password
+```
+
+终端不会显示输入的密码。把命令输出的整行复制到 `.env`。生成会话密钥可运行：
+
+```bash
+openssl rand -hex 32
+```
+
+通过 Cloudflare Tunnel 的 HTTPS 域名访问时，`AUTH_COOKIE_SECURE` 保持 `true`。如果暂时只通过 `http://192.168.x.x:3000` 调试，需设为 `false`，否则浏览器不会保存登录 Cookie。
 
 启动：
 
@@ -52,6 +68,8 @@ docker compose up -d --build
 ```
 
 打开 `http://localhost:3000`。局域网设备可访问 `http://电脑局域网IP:3000`。不要把 3000 端口直接暴露到公网；应使用 HTTPS 反向代理或安全隧道。
+
+勾选“在此设备保持登录 30 天”后，会话会在活跃使用时自动续期，最长不超过 1 年；未勾选时关闭浏览器后 Cookie 失效。修改 `SESSION_SECRET` 可以立即让全部设备退出登录。
 
 ## 日常操作
 
@@ -102,6 +120,8 @@ docker compose start app
 
 ## 升级与维护
 
+从旧版浏览器弹窗登录升级时，先在 `.env` 中删除旧的 `APP_PASSWORD`，按“首次启动”章节新增 `APP_PASSWORD_HASH`、`SESSION_SECRET` 和 `AUTH_COOKIE_SECURE`，再重建容器：
+
 ```bash
 docker compose up -d --build
 docker compose ps
@@ -132,7 +152,7 @@ node ../work/release-test/final-release-test.mjs
 - PostgreSQL 17
 - `postgres` 数据库客户端
 - Docker Compose
-- Basic Auth 中间件
+- bcrypt 密码校验与签名会话 Cookie
 
 主要接口：
 
@@ -144,7 +164,8 @@ node ../work/release-test/final-release-test.mjs
 
 ## 安全提醒
 
-- 首次发布前必须修改 `.env` 中的两个密码。
+- 首次发布前必须设置数据库密码、登录密码哈希和随机会话密钥。
+- 登录连续失败 5 次后，同一来源与用户名会暂停尝试 15 分钟。
 - 不要提交 `.env`、数据库备份或家庭财务导出文件。
 - 公网访问必须使用 HTTPS。
 - 定期测试备份能否恢复，而不只是确认备份文件存在。

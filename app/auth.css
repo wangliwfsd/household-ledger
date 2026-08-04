@@ -1,0 +1,1 @@
+.avatar{visibility:hidden}.auth-logout{position:fixed;z-index:4;right:5vw;top:32px;border:0;border-radius:50%;width:38px;height:38px;background:var(--cream);color:#6d5d37;cursor:pointer}.auth-logout:hover{background:#e7dcc1}@media(max-width:700px){.auth-logout{top:22px;right:14px}}

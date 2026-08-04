@@ -20,8 +20,10 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       DATABASE_URL: postgres://ledger:${POSTGRES_PASSWORD:-change-this-password}@db:5432/ledger
-      APP_USERNAME: ${APP_USERNAME:-family}
-      APP_PASSWORD: ${APP_PASSWORD:-change-this-login-password}
+      APP_USERNAME: ${APP_USERNAME:?请在 .env 中设置 APP_USERNAME}
+      APP_PASSWORD_HASH: ${APP_PASSWORD_HASH:?请在 .env 中设置 APP_PASSWORD_HASH}
+      SESSION_SECRET: ${SESSION_SECRET:?请在 .env 中设置 SESSION_SECRET}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
     ports:
       - "3000:3000"
     depends_on:
