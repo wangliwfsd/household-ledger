@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.wrangler
+dist
+outputs
+*.log
+.env

@@ -1,0 +1,4 @@
+import { db } from "../../../lib/db";
+export const dynamic="force-dynamic";
+const csv=(v:unknown)=>`"${String(v??"").replaceAll('"','""')}"`;
+export async function GET(){try{const sql=db();const rows=await sql`select b.month,a.name,a.kind,a.category,a.currency,b.balance,b.note,r.aud_cny_rate from monthly_balances b join accounts a on a.id=b.account_id left join monthly_exchange_rates r on r.month=b.month order by b.month,a.sort_order`;const head=["月份","账户","类型","分类","币种","余额","备注","澳元兑人民币汇率"];const body=[head,...rows.map(r=>[r.month,r.name,r.kind,r.category,r.currency,r.balance,r.note,r.aud_cny_rate])].map(r=>r.map(csv).join(",")).join("\r\n");return new Response("\ufeff"+body,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="household-ledger.csv"`}});}catch{return Response.json({error:"export failed"},{status:500});}}

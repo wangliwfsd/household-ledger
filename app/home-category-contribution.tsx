@@ -1,0 +1,3 @@
+"use client";
+const money=(n:number)=>new Intl.NumberFormat("zh-CN",{maximumFractionDigits:2}).format(n);
+export function HomeCategoryContribution({rows}:{rows:{category:string;value:number}[]}){const max=Math.max(...rows.map(x=>Math.abs(x.value)),1);return <div className="contribution-card home-category"><div className="panel-title"><div><h3>本月分类贡献</h3><p>各类别对净资产变化的影响 · AUD</p></div></div><div className="home-category-grid">{rows.map(r=><div className="home-category-row" key={r.category}><span>{r.category}</span><div><i className={r.value>=0?"bar-pos":"bar-neg"} style={{width:`${Math.abs(r.value)/max*100}%`}}/></div><b className={r.value>=0?"positive":"negative"}>{r.value>=0?"+":""}${money(r.value)}</b></div>)}</div></div>;}
