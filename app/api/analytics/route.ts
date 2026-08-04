@@ -16,6 +16,7 @@ export async function GET() {
         union select ${currentMonth}::char(7)
       )
       select m.month,a.id,a.name,a.kind,a.category,a.currency,
+        (a.closed_month is not null) as closed,
         coalesce(b.balance,0)::float as balance,
         coalesce(xr.aud_cny_rate,${defaultRate})::float as rate
       from months m cross join accounts a
@@ -30,7 +31,7 @@ export async function GET() {
       order by m.month,a.sort_order,a.id`;
 
     const monthMap = new Map<string,{month:string;assets:number;liabilities:number;net:number;categories:Record<string,number>}>();
-    const accountMap = new Map<number,{id:number;name:string;kind:string;category:string;currency:string;points:Array<{month:string;value:number;nativeValue:number}>}>();
+    const accountMap = new Map<number,{id:number;name:string;kind:string;category:string;currency:string;closed:boolean;points:Array<{month:string;value:number;nativeValue:number}>}>();
     for (const row of rows) {
       const month = String(row.month);
       if (!monthMap.has(month)) monthMap.set(month,{month,assets:0,liabilities:0,net:0,categories:Object.fromEntries(categories.map(category=>[category,0]))});
@@ -41,7 +42,7 @@ export async function GET() {
       monthPoint.net = monthPoint.assets - monthPoint.liabilities;
       if (categories.includes(String(row.category))) monthPoint.categories[String(row.category)] += value;
       const id = Number(row.id);
-      if (!accountMap.has(id)) accountMap.set(id,{id,name:String(row.name),kind:String(row.kind),category:String(row.category),currency:String(row.currency),points:[]});
+      if (!accountMap.has(id)) accountMap.set(id,{id,name:String(row.name),kind:String(row.kind),category:String(row.category),currency:String(row.currency),closed:Boolean(row.closed),points:[]});
       accountMap.get(id)!.points.push({month,value,nativeValue});
     }
     return NextResponse.json({months:[...monthMap.values()],accounts:[...accountMap.values()]});

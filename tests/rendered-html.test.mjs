@@ -49,9 +49,13 @@ test("ships the second-stage historical analytics suite", async () => {
   ]);
   assert.match(api, /monthly_exchange_rates/);
   assert.match(api, /categories/);
+  assert.match(api, /closed_month/);
   assert.match(charts, /资产、负债与净资产趋势/);
   assert.match(charts, /资产负债分类堆叠趋势/);
   assert.match(charts, /账户余额趋势/);
+  assert.match(charts, /资产账户/);
+  assert.match(charts, /负债账户/);
+  assert.match(charts, /已关闭账户/);
   assert.match(charts, /onSelectMonth/);
   assert.match(dashboard, /setTab\("entry"\)/);
 });

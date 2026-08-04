@@ -12,6 +12,7 @@ import "./data-safety.css";
 import "./analytics.css";
 import "./analytics-range.css";
 import "./installment-link.css";
+import "./account-picker-groups.css";
 
 export const metadata: Metadata = {
   title: "家衡｜家庭资产账本",
