@@ -54,7 +54,23 @@ export async function GET(request: Request) {
 export async function PUT(request:Request) {
   try {
     const body=await request.json(); const sql=db();
+    if(body.preserveCurrentMonth){
+      const defaultRate=Number((await sql`select aud_cny_rate from settings where id=1`)[0]?.aud_cny_rate||body.rate);
+      const storedRate=Number((await sql`select aud_cny_rate from monthly_exchange_rates where month=${body.month}`)[0]?.aud_cny_rate||defaultRate);
+      const storedNote=String((await sql`select note from monthly_balances where month=${body.month} and note is not null and note<>'' order by updated_at desc limit 1`)[0]?.note||"");
+      const storedBalances=await sql`select a.id,coalesce(cur.balance,prev.balance,0)::float as balance from accounts a left join monthly_balances cur on cur.account_id=a.id and cur.month=${body.month} left join lateral (select balance from monthly_balances b where b.account_id=a.id and b.month<${body.month} order by b.month desc limit 1) prev on true where (a.opened_month is null or a.opened_month<=${body.month}) and (a.closed_month is null or a.closed_month>=${body.month})`;
+      const balanceById=new Map(storedBalances.map(row=>[Number(row.id),Number(row.balance)]));
+      const unchanged=Math.abs(storedRate-Number(body.rate))<0.000001&&storedNote===String(body.note||"")&&body.accounts.every((account:{id:number;current:number})=>Math.abs((balanceById.get(Number(account.id))??0)-Number(account.current))<0.005);
+      if(unchanged)return NextResponse.json({ok:true,noChange:true});
+    }
     await sql.begin(async tx=>{
+      if(body.preserveCurrentMonth){
+        const note=String((await tx`select note from monthly_balances where month=${body.month} and note is not null and note<>'' order by updated_at desc limit 1`)[0]?.note||"");
+        const balances=await tx`select a.id as "accountId",coalesce(cur.balance,prev.balance,0)::float as balance,${note}::text as note from accounts a left join monthly_balances cur on cur.account_id=a.id and cur.month=${body.month} left join lateral (select balance from monthly_balances b where b.account_id=a.id and b.month<${body.month} order by b.month desc limit 1) prev on true where (a.opened_month is null or a.opened_month<=${body.month}) and (a.closed_month is null or a.closed_month>=${body.month}) order by a.id`;
+        const defaultRate=Number((await tx`select aud_cny_rate from settings where id=1`)[0]?.aud_cny_rate||body.rate);
+        const rate=Number((await tx`select aud_cny_rate from monthly_exchange_rates where month=${body.month}`)[0]?.aud_cny_rate||defaultRate);
+        await tx`insert into month_snapshots(month,reason,snapshot) values(${body.month},'before_history_edit',${tx.json({month:body.month,rate,balances})})`;
+      }
       await tx`insert into monthly_exchange_rates(month,aud_cny_rate,updated_at) values(${body.month},${body.rate},now()) on conflict(month) do update set aud_cny_rate=excluded.aud_cny_rate,updated_at=now()`;
       if(!body.preserveCurrentMonth) await tx`update settings set current_month=${body.month},aud_cny_rate=${body.rate},updated_at=now() where id=1`;
       for(const a of body.accounts){

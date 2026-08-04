@@ -13,5 +13,8 @@ ENV NODE_ENV=production
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
+COPY --from=build /app/db/migrations ./db/migrations
+COPY --from=build /app/scripts/migrate.mjs ./scripts/migrate.mjs
 EXPOSE 3000
-CMD ["node","server.js"]
+CMD ["sh","-c","node scripts/migrate.mjs && node server.js"]
