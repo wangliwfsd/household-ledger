@@ -24,12 +24,12 @@ export async function GET(request: Request) {
         and (a.closed_month is null or a.closed_month>=${month})
       order by a.sort_order`;
     if(month===currentMonth){
-      const installments=await sql`select principal_per_period::float as principal,fee_per_period::float as fee,paid_periods as paid,total_periods as total,first_payment_date::text as first_date from installments`;
+      const installments=await sql`select principal_per_period::float as principal,fee_per_period::float as fee,paid_periods as paid,total_periods as total,first_payment_date::text as first_date,current_period_in_account_balance as current_in_account from installments`;
       const now=new Date();
       const installmentBalance=installments.reduce((sum,row)=>{
         const first=new Date(String(row.first_date)+"T00:00:00");
         const automatic=first>now?0:Math.max(0,(now.getFullYear()-first.getFullYear())*12+now.getMonth()-first.getMonth()+1);
-        const remaining=Math.max(0,Number(row.total)-Math.max(Number(row.paid),automatic));
+        const remaining=Math.max(0,Number(row.total)-Math.max(Number(row.paid),automatic)-(row.current_in_account?1:0));
         return sum+remaining*(Number(row.principal)+Number(row.fee));
       },0);
       const linked=accounts.find(a=>a.name==="消费分期");

@@ -1,10 +1,466 @@
 "use client";
-import {useEffect,useMemo,useState} from "react";
-type Row={id:number;platform:string;item:string;totalPrincipal:number;principalPerPeriod:number;feePerPeriod:number;paidPeriods:number;totalPeriods:number;firstPaymentDate:string};
-type Form=Omit<Row,"id">;
-type Mortgage={totalLoan:number;annualRate:number;years:number;scheduledPayment:number;loanBalance:number;offset:number;income:number;extraPayment:number;totalMonthlyPayment:number;annualPaymentGrowth:number};
-const money=(n:number)=>new Intl.NumberFormat("zh-CN",{maximumFractionDigits:2}).format(n);
-const blank=():Form=>({platform:"",item:"",totalPrincipal:0,principalPerPeriod:0,feePerPeriod:0,paidPeriods:0,totalPeriods:12,firstPaymentDate:new Date().toISOString().slice(0,10)});
-const autoPeriods=(date:string,total:number)=>{const first=new Date(date+"T00:00:00"),now=new Date();if(first>now)return 0;return Math.min(total,(now.getFullYear()-first.getFullYear())*12+now.getMonth()-first.getMonth()+1);};
-export function InstallmentManager(){const[rows,setRows]=useState<Row[]>([]),[hideSettled,setHideSettled]=useState(true),[editing,setEditing]=useState<number|null>(null),[form,setForm]=useState<Form>(blank());const load=()=>fetch("/api/installments").then(r=>r.json()).then(d=>setRows(d.installments||[]));useEffect(()=>{load();},[]);const derived=useMemo(()=>rows.map(r=>{const paid=Math.max(r.paidPeriods,autoPeriods(r.firstPaymentDate,r.totalPeriods)),remaining=Math.max(0,r.totalPeriods-paid),first=new Date(r.firstPaymentDate+"T00:00:00");first.setMonth(first.getMonth()+paid);return{...r,paid,remaining,remainingPrincipal:remaining*r.principalPerPeriod,remainingFees:remaining*r.feePerPeriod,remainingPayment:remaining*(r.principalPerPeriod+r.feePerPeriod),nextDate:remaining?first.toISOString().slice(0,10):"—",status:remaining===0?"已结清":paid===0?"未开始":"还款中"};}).sort((a,b)=>(a.status==="已结清"?1:0)-(b.status==="已结清"?1:0)),[rows]);const open=derived.filter(r=>r.remaining>0),visible=hideSettled?open:derived,payment=open.reduce((s,r)=>s+r.remainingPayment,0),principal=open.reduce((s,r)=>s+r.remainingPrincipal,0),fees=open.reduce((s,r)=>s+r.remainingFees,0),next=open.map(r=>r.nextDate).sort()[0]||"—",nextPay=open.filter(r=>r.nextDate===next).reduce((s,r)=>s+r.principalPerPeriod+r.feePerPeriod,0);const openNew=()=>{setForm(blank());setEditing(0);};const openEdit=(r:Row)=>{setForm({platform:r.platform,item:r.item,totalPrincipal:r.totalPrincipal,principalPerPeriod:r.principalPerPeriod,feePerPeriod:r.feePerPeriod,paidPeriods:r.paidPeriods,totalPeriods:r.totalPeriods,firstPaymentDate:r.firstPaymentDate});setEditing(r.id);};const save=async()=>{if(!form.platform||!form.totalPeriods||!form.principalPerPeriod)return;const current={...form,paidPeriods:autoPeriods(form.firstPaymentDate,form.totalPeriods)};const r=await fetch("/api/installments",{method:editing?"PATCH":"POST",headers:{"content-type":"application/json"},body:JSON.stringify(editing?{installment:{id:editing,...current}}:current)});if(r.ok){setEditing(null);await load();}};const remove=async()=>{if(!editing||!confirm("确定删除这条分期记录吗？此操作不会删除账本历史，但会重新计算消费分期余额。"))return;const r=await fetch("/api/installments?id="+editing,{method:"DELETE"});if(r.ok){setEditing(null);await load();}};return <><div className="page-toolbar"><div><h3>分期管理</h3><p>当前期数根据首期还款日自动计算；点击任意记录可编辑</p></div><div className="action-group"><button className="soft-btn" onClick={()=>setHideSettled(!hideSettled)}>{hideSettled?`查看已结清（${derived.length-open.length}）`:"隐藏已结清"}</button><button className="primary-btn" onClick={openNew}>＋ 新增分期</button></div></div><div className="installment-summary"><article><small>剩余应付款 (CNY)</small><strong>¥{money(payment)}</strong></article><article><small>剩余本金</small><strong>¥{money(principal)}</strong></article><article><small>未来费用</small><strong>¥{money(fees)}</strong></article><article><small>下期还款 · {next}</small><strong>¥{money(nextPay)}</strong></article></div><div className="calculator-card"><div className="installment-table"><div className="installment-head"><span>平台 / 项目</span><span>每期本金</span><span>每期费用</span><span>当前期数</span><span>剩余应付</span><span>下期日期</span><span>状态</span></div>{visible.map(r=><button className={`installment-line installment-edit ${r.status==="已结清"?"settled":""}`} key={r.id} onClick={()=>openEdit(r)}><span><b>{r.platform}</b><small>{r.item||"未命名分期"}</small></span><span>¥{money(r.principalPerPeriod)}</span><span>¥{money(r.feePerPeriod)}</span><span><b>{r.paid}</b><small>/ {r.totalPeriods} 期 · 自动</small></span><span>¥{money(r.remainingPayment)}</span><span>{r.nextDate}</span><span className={`installment-status ${r.status}`}>{r.status}</span></button>)}</div></div>{editing!==null&&<div className="modal-backdrop" onClick={()=>setEditing(null)}><div className="modal" onClick={e=>e.stopPropagation()}><h3>{editing?"编辑分期":"新增分期"}</h3><div className="form-grid"><label>平台<input value={form.platform} onChange={e=>setForm({...form,platform:e.target.value})}/></label><label>项目<input value={form.item} onChange={e=>setForm({...form,item:e.target.value})}/></label><label>总本金<input type="number" value={form.totalPrincipal} onChange={e=>setForm({...form,totalPrincipal:Number(e.target.value)})}/></label><label>每期本金<input type="number" value={form.principalPerPeriod} onChange={e=>setForm({...form,principalPerPeriod:Number(e.target.value)})}/></label><label>每期费用<input type="number" value={form.feePerPeriod} onChange={e=>setForm({...form,feePerPeriod:Number(e.target.value)})}/></label><label>总期数<input type="number" value={form.totalPeriods} onChange={e=>setForm({...form,totalPeriods:Number(e.target.value)})}/></label><label>首期还款日<input type="date" value={form.firstPaymentDate} onChange={e=>setForm({...form,firstPaymentDate:e.target.value})}/></label><label>自动计算当前期数<input readOnly value={autoPeriods(form.firstPaymentDate,form.totalPeriods)}/></label></div><div className="modal-actions">{editing!==0&&<button className="danger-btn" onClick={remove}>删除记录</button>}<button onClick={()=>setEditing(null)}>取消</button><button onClick={save}>保存分期</button></div></div></div>}</>;}
-export function MortgageCalculator(){const[m,setM]=useState<Mortgage|null>(null),[saved,setSaved]=useState("");useEffect(()=>{fetch("/api/installments").then(r=>r.json()).then(d=>setM(d.mortgage));},[]);if(!m)return <div className="calculator-card"><div className="empty-state">正在读取房贷参数…</div></div>;let balance=m.totalLoan;const schedule=[];for(let i=1;i<=Math.ceil(m.years*12)&&balance-m.offset>=0;i++){const interest=(balance-m.offset)*m.annualRate/12,payment=m.totalMonthlyPayment*Math.pow(1+m.annualPaymentGrowth,Math.floor(i/12)),principal=Math.min(balance,Math.max(0,payment-interest));balance-=principal;schedule.push({i,payment,interest,principal,balance});}const change=(key:keyof Mortgage,value:number)=>setM({...m,[key]:value});const save=async()=>{const r=await fetch("/api/installments",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({mortgage:m})});setSaved(r.ok?"参数已保存":"保存失败");};return <><div className="page-toolbar"><div><h3>房贷专项测算</h3><p>与原表一致：第 12、24、36…期开始应用年度还款增长</p></div><button className="primary-btn" onClick={save}>保存参数</button></div>{saved&&<p className="status-dot">● {saved}</p>}<div className="calculator-card"><div className="mortgage-inputs">{([['totalLoan','贷款总额'],['annualRate','年利率'],['years','年限'],['loanBalance','当前贷款余额'],['offset','Offset'],['income','月收入'],['totalMonthlyPayment','总月还款'],['annualPaymentGrowth','还款年增长率']] as [keyof Mortgage,string][]).map(([key,label])=><label key={key}>{label}{key==="annualRate"||key==="annualPaymentGrowth"?<input type="number" step="0.01" value={(m[key]*100).toFixed(2)} onChange={e=>change(key,Number(e.target.value)/100)}/>:<input type="number" step="0.01" value={m[key]} onChange={e=>change(key,Number(e.target.value))}/>}</label>)}</div><div className="installment-summary"><article><small>标准月供</small><strong>${money(m.scheduledPayment)}</strong></article><article><small>额外还款</small><strong>${money(Math.max(0,m.totalMonthlyPayment-m.scheduledPayment))}</strong></article><article><small>还贷占收入</small><strong>{(m.totalMonthlyPayment/m.income*100).toFixed(1)}%</strong></article><article><small>预计还清</small><strong>{Math.floor(schedule.length/12)} 年 {schedule.length%12} 个月</strong></article></div><div className="schedule"><div className="schedule-row"><span>期数</span><b>每月还款</b><b>本金</b><b>利息</b><b>贷款余额</b></div>{schedule.map(r=><div className="schedule-row" key={r.i}><span>{r.i}</span><span>{money(r.payment)}</span><span>{money(r.principal)}</span><span>{money(r.interest)}</span><span>{money(r.balance)}</span></div>)}</div></div></>;}
+import { useEffect, useMemo, useState } from "react";
+type Row = {
+  id: number;
+  platform: string;
+  item: string;
+  totalPrincipal: number;
+  principalPerPeriod: number;
+  feePerPeriod: number;
+  paidPeriods: number;
+  totalPeriods: number;
+  firstPaymentDate: string;
+  currentPeriodInAccountBalance: boolean;
+};
+type Form = Omit<Row, "id">;
+type Mortgage = {
+  totalLoan: number;
+  annualRate: number;
+  years: number;
+  scheduledPayment: number;
+  loanBalance: number;
+  offset: number;
+  income: number;
+  extraPayment: number;
+  totalMonthlyPayment: number;
+  annualPaymentGrowth: number;
+};
+const money = (n: number) =>
+  new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(n);
+const blank = (): Form => ({
+  platform: "",
+  item: "",
+  totalPrincipal: 0,
+  principalPerPeriod: 0,
+  feePerPeriod: 0,
+  paidPeriods: 0,
+  totalPeriods: 12,
+  firstPaymentDate: new Date().toISOString().slice(0, 10),
+  currentPeriodInAccountBalance: false,
+});
+const autoPeriods = (date: string, total: number) => {
+  const first = new Date(date + "T00:00:00"),
+    now = new Date();
+  if (first > now) return 0;
+  return Math.min(
+    total,
+    (now.getFullYear() - first.getFullYear()) * 12 +
+      now.getMonth() -
+      first.getMonth() +
+      1,
+  );
+};
+export function InstallmentManager() {
+  const [rows, setRows] = useState<Row[]>([]),
+    [hideSettled, setHideSettled] = useState(true),
+    [editing, setEditing] = useState<number | null>(null),
+    [form, setForm] = useState<Form>(blank());
+  const load = () =>
+    fetch("/api/installments")
+      .then((r) => r.json())
+      .then((d) => setRows(d.installments || []));
+  useEffect(() => {
+    load();
+  }, []);
+  const derived = useMemo(
+    () =>
+      rows
+        .map((r) => {
+          const paid = Math.max(
+              r.paidPeriods,
+              autoPeriods(r.firstPaymentDate, r.totalPeriods),
+            ),
+            remaining = Math.max(0, r.totalPeriods - paid),
+            first = new Date(r.firstPaymentDate + "T00:00:00");
+          first.setMonth(first.getMonth() + paid);
+          return {
+            ...r,
+            paid,
+            remaining,
+            remainingPrincipal: remaining * r.principalPerPeriod,
+            remainingFees: remaining * r.feePerPeriod,
+            remainingPayment:
+              remaining * (r.principalPerPeriod + r.feePerPeriod),
+            linkedPayment: Math.max(0,remaining-(r.currentPeriodInAccountBalance?1:0))*(r.principalPerPeriod+r.feePerPeriod),
+            nextDate: remaining ? first.toISOString().slice(0, 10) : "—",
+            status:
+              remaining === 0 ? "已结清" : paid === 0 ? "未开始" : "还款中",
+          };
+        })
+        .sort(
+          (a, b) =>
+            (a.status === "已结清" ? 1 : 0) - (b.status === "已结清" ? 1 : 0),
+        ),
+    [rows],
+  );
+  const open = derived.filter((r) => r.remaining > 0),
+    visible = hideSettled ? open : derived,
+    linkedPayment = open.reduce((s, r) => s + r.linkedPayment, 0),
+    principal = open.reduce((s, r) => s + r.remainingPrincipal, 0),
+    fees = open.reduce((s, r) => s + r.remainingFees, 0),
+    next = open.map((r) => r.nextDate).sort()[0] || "—",
+    nextPay = open
+      .filter((r) => r.nextDate === next)
+      .reduce((s, r) => s + r.principalPerPeriod + r.feePerPeriod, 0);
+  const openNew = () => {
+    setForm(blank());
+    setEditing(0);
+  };
+  const openEdit = (r: Row) => {
+    setForm({
+      platform: r.platform,
+      item: r.item,
+      totalPrincipal: r.totalPrincipal,
+      principalPerPeriod: r.principalPerPeriod,
+      feePerPeriod: r.feePerPeriod,
+      paidPeriods: r.paidPeriods,
+      totalPeriods: r.totalPeriods,
+      firstPaymentDate: r.firstPaymentDate,
+      currentPeriodInAccountBalance: r.currentPeriodInAccountBalance,
+    });
+    setEditing(r.id);
+  };
+  const save = async () => {
+    if (!form.platform || !form.totalPeriods || !form.principalPerPeriod)
+      return;
+    const current = {
+      ...form,
+      paidPeriods: autoPeriods(form.firstPaymentDate, form.totalPeriods),
+    };
+    const r = await fetch("/api/installments", {
+      method: editing ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        editing ? { installment: { id: editing, ...current } } : current,
+      ),
+    });
+    if (r.ok) {
+      setEditing(null);
+      await load();
+    }
+  };
+  const remove = async () => {
+    if (
+      !editing ||
+      !confirm(
+        "确定删除这条分期记录吗？此操作不会删除账本历史，但会重新计算消费分期余额。",
+      )
+    )
+      return;
+    const r = await fetch("/api/installments?id=" + editing, {
+      method: "DELETE",
+    });
+    if (r.ok) {
+      setEditing(null);
+      await load();
+    }
+  };
+  return (
+    <>
+      <div className="page-toolbar">
+        <div>
+          <h3>分期管理</h3>
+          <p>当前期数根据首期还款日自动计算；点击任意记录可编辑</p>
+        </div>
+        <div className="action-group">
+          <button
+            className="soft-btn"
+            onClick={() => setHideSettled(!hideSettled)}
+          >
+            {hideSettled
+              ? `查看已结清（${derived.length - open.length}）`
+              : "隐藏已结清"}
+          </button>
+          <button className="primary-btn" onClick={openNew}>
+            ＋ 新增分期
+          </button>
+        </div>
+      </div>
+      <div className="installment-summary">
+        <article>
+          <small>消费分期账户余额 (CNY)</small>
+          <strong>¥{money(linkedPayment)}</strong>
+        </article>
+        <article>
+          <small>剩余本金</small>
+          <strong>¥{money(principal)}</strong>
+        </article>
+        <article>
+          <small>未来费用</small>
+          <strong>¥{money(fees)}</strong>
+        </article>
+        <article>
+          <small>下期还款 · {next}</small>
+          <strong>¥{money(nextPay)}</strong>
+        </article>
+      </div>
+      <div className="calculator-card">
+        <div className="installment-table">
+          <div className="installment-head">
+            <span>平台 / 项目</span>
+            <span>每期本金</span>
+            <span>每期费用</span>
+            <span>当前期数</span>
+            <span>剩余应付</span>
+            <span>下期日期</span>
+            <span>本期归属</span>
+            <span>状态</span>
+          </div>
+          {visible.map((r) => (
+            <button
+              className={`installment-line installment-edit ${r.status === "已结清" ? "settled" : ""}`}
+              key={r.id}
+              onClick={() => openEdit(r)}
+            >
+              <span>
+                <b>{r.platform}</b>
+                <small>{r.item || "未命名分期"}</small>
+              </span>
+              <span>¥{money(r.principalPerPeriod)}</span>
+              <span>¥{money(r.feePerPeriod)}</span>
+              <span>
+                <b>{r.paid}</b>
+                <small>/ {r.totalPeriods} 期 · 自动</small>
+              </span>
+              <span>¥{money(r.remainingPayment)}</span>
+              <span>{r.nextDate}</span>
+              <span className={`balance-link-pill ${r.currentPeriodInAccountBalance?"excluded":"included"}`}>{r.currentPeriodInAccountBalance?"已在信用卡":"计入分期"}</span>
+              <span className={`installment-status ${r.status}`}>
+                {r.status}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {editing !== null && (
+        <div className="modal-backdrop" onClick={() => setEditing(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{editing ? "编辑分期" : "新增分期"}</h3>
+            <div className="form-grid">
+              <label>
+                平台
+                <input
+                  value={form.platform}
+                  onChange={(e) =>
+                    setForm({ ...form, platform: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                项目
+                <input
+                  value={form.item}
+                  onChange={(e) => setForm({ ...form, item: e.target.value })}
+                />
+              </label>
+              <label>
+                总本金
+                <input
+                  type="number"
+                  value={form.totalPrincipal}
+                  onChange={(e) =>
+                    setForm({ ...form, totalPrincipal: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                每期本金
+                <input
+                  type="number"
+                  value={form.principalPerPeriod}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      principalPerPeriod: Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              <label>
+                每期费用
+                <input
+                  type="number"
+                  value={form.feePerPeriod}
+                  onChange={(e) =>
+                    setForm({ ...form, feePerPeriod: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                总期数
+                <input
+                  type="number"
+                  value={form.totalPeriods}
+                  onChange={(e) =>
+                    setForm({ ...form, totalPeriods: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                首期还款日
+                <input
+                  type="date"
+                  value={form.firstPaymentDate}
+                  onChange={(e) =>
+                    setForm({ ...form, firstPaymentDate: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                自动计算当前期数
+                <input
+                  readOnly
+                  value={autoPeriods(form.firstPaymentDate, form.totalPeriods)}
+                />
+              </label>
+              <label className="balance-link-toggle">
+                <input type="checkbox" checked={form.currentPeriodInAccountBalance} onChange={(e)=>setForm({...form,currentPeriodInAccountBalance:e.target.checked})}/>
+                <span><b>本期金额已包含在信用卡账户余额中</b><small>勾选后仅从“消费分期”余额中扣除本期金额；后续期数仍会全部计入。</small></span>
+              </label>
+            </div>
+            <div className="modal-actions">
+              {editing !== 0 && (
+                <button className="danger-btn" onClick={remove}>
+                  删除记录
+                </button>
+              )}
+              <button onClick={() => setEditing(null)}>取消</button>
+              <button onClick={save}>保存分期</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+export function MortgageCalculator() {
+  const [m, setM] = useState<Mortgage | null>(null),
+    [saved, setSaved] = useState("");
+  useEffect(() => {
+    fetch("/api/installments")
+      .then((r) => r.json())
+      .then((d) => setM(d.mortgage));
+  }, []);
+  if (!m)
+    return (
+      <div className="calculator-card">
+        <div className="empty-state">正在读取房贷参数…</div>
+      </div>
+    );
+  let balance = m.totalLoan;
+  const schedule = [];
+  for (
+    let i = 1;
+    i <= Math.ceil(m.years * 12) && balance - m.offset >= 0;
+    i++
+  ) {
+    const interest = ((balance - m.offset) * m.annualRate) / 12,
+      payment =
+        m.totalMonthlyPayment *
+        Math.pow(1 + m.annualPaymentGrowth, Math.floor(i / 12)),
+      principal = Math.min(balance, Math.max(0, payment - interest));
+    balance -= principal;
+    schedule.push({ i, payment, interest, principal, balance });
+  }
+  const change = (key: keyof Mortgage, value: number) =>
+    setM({ ...m, [key]: value });
+  const save = async () => {
+    const r = await fetch("/api/installments", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mortgage: m }),
+    });
+    setSaved(r.ok ? "参数已保存" : "保存失败");
+  };
+  return (
+    <>
+      <div className="page-toolbar">
+        <div>
+          <h3>房贷专项测算</h3>
+          <p>与原表一致：第 12、24、36…期开始应用年度还款增长</p>
+        </div>
+        <button className="primary-btn" onClick={save}>
+          保存参数
+        </button>
+      </div>
+      {saved && <p className="status-dot">● {saved}</p>}
+      <div className="calculator-card">
+        <div className="mortgage-inputs">
+          {(
+            [
+              ["totalLoan", "贷款总额"],
+              ["annualRate", "年利率"],
+              ["years", "年限"],
+              ["loanBalance", "当前贷款余额"],
+              ["offset", "Offset"],
+              ["income", "月收入"],
+              ["totalMonthlyPayment", "总月还款"],
+              ["annualPaymentGrowth", "还款年增长率"],
+            ] as [keyof Mortgage, string][]
+          ).map(([key, label]) => (
+            <label key={key}>
+              {label}
+              {key === "annualRate" || key === "annualPaymentGrowth" ? (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={(m[key] * 100).toFixed(2)}
+                  onChange={(e) => change(key, Number(e.target.value) / 100)}
+                />
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={m[key]}
+                  onChange={(e) => change(key, Number(e.target.value))}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+        <div className="installment-summary">
+          <article>
+            <small>标准月供</small>
+            <strong>${money(m.scheduledPayment)}</strong>
+          </article>
+          <article>
+            <small>额外还款</small>
+            <strong>
+              ${money(Math.max(0, m.totalMonthlyPayment - m.scheduledPayment))}
+            </strong>
+          </article>
+          <article>
+            <small>还贷占收入</small>
+            <strong>
+              {((m.totalMonthlyPayment / m.income) * 100).toFixed(1)}%
+            </strong>
+          </article>
+          <article>
+            <small>预计还清</small>
+            <strong>
+              {Math.floor(schedule.length / 12)} 年 {schedule.length % 12} 个月
+            </strong>
+          </article>
+        </div>
+        <div className="schedule">
+          <div className="schedule-row">
+            <span>期数</span>
+            <b>每月还款</b>
+            <b>本金</b>
+            <b>利息</b>
+            <b>贷款余额</b>
+          </div>
+          {schedule.map((r) => (
+            <div className="schedule-row" key={r.i}>
+              <span>{r.i}</span>
+              <span>{money(r.payment)}</span>
+              <span>{money(r.principal)}</span>
+              <span>{money(r.interest)}</span>
+              <span>{money(r.balance)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}

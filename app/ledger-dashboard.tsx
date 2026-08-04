@@ -4,6 +4,7 @@ import { InstallmentManager, MortgageCalculator } from "./installment-manager";
 import { NetWorthTrend as Trend } from "./net-worth-trend";
 import { HomeCategoryContribution } from "./home-category-contribution";
 import { MonthVersions } from "./month-versions";
+import { AnalysisEnhancements } from "./analysis-enhancements";
 type Account = {
   id: number;
   name: string;
@@ -423,6 +424,7 @@ export function LedgerDashboard() {
                 ))}
               </div>
             </div>
+            <AnalysisEnhancements onSelectMonth={async(month)=>{await load(month);setTab("entry");}} />
           </>
         )}
         {tab === "entry" && (
