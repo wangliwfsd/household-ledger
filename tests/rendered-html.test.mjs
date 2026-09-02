@@ -71,3 +71,11 @@ test("deduplicates only the current installment period", async () => {
   assert.match(api, /current_in_account \? 1 : 0/);
   assert.match(manager, /后续期数仍会全部计入/);
 });
+
+test("keeps decimal input text while editing balances", async () => {
+  const dashboard = await read("app/ledger-dashboard.tsx");
+  assert.match(dashboard, /balanceInputs/);
+  assert.match(dashboard, /inputMode="decimal"/);
+  assert.match(dashboard, /Number\.isFinite/);
+  assert.doesNotMatch(dashboard, /current: Number\(value\) \|\| 0/);
+});

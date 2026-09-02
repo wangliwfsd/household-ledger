@@ -46,6 +46,7 @@ const label = (m: string) => {
 };
 export function LedgerDashboard() {
   const [data, setData] = useState<Data | null>(null),
+    [balanceInputs, setBalanceInputs] = useState<Record<number, string>>({}),
     [tab, setTab] = useState<Tab>("home"),
     [message, setMessage] = useState("正在读取…"),
     [adding, setAdding] = useState(false),
@@ -64,7 +65,11 @@ export function LedgerDashboard() {
   const load = async (month?: string) => {
     const r = await fetch(`/api/ledger${month ? `?month=${month}` : ""}`);
     if (!r.ok) return;
-    setData(await r.json());
+    const next = await r.json();
+    setData(next);
+    setBalanceInputs(
+      Object.fromEntries(next.accounts.map((account: Account) => [account.id, String(account.current)])),
+    );
     setEditingHistory(false);
     setMessage(
       month && month !== data?.currentMonth
@@ -78,6 +83,9 @@ export function LedgerDashboard() {
       .then((initial) => {
         if (initial) {
           setData(initial);
+          setBalanceInputs(
+            Object.fromEntries(initial.accounts.map((account: Account) => [account.id, String(account.current)])),
+          );
           setMessage("已载入上月余额");
         }
       });
@@ -117,13 +125,18 @@ export function LedgerDashboard() {
       .filter((a) => a.category === category)
       .reduce((s, a) => s + a.value, 0),
   }));
-  const update = (id: number, value: string) =>
+  const update = (id: number, value: string) => {
+    setBalanceInputs((current) => ({ ...current, [id]: value }));
+    if (value.trim() === "") return;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return;
     setData({
       ...data,
       accounts: data.accounts.map((a) =>
-        a.id === id ? { ...a, current: Number(value) || 0 } : a,
+        a.id === id ? { ...a, current: number } : a,
       ),
     });
+  };
   const persistSave = async () => {
     setSaving(true);
     const r = await fetch("/api/ledger", {
@@ -454,6 +467,9 @@ export function LedgerDashboard() {
                       if (r.ok) {
                         const next = await r.json();
                         setData({ ...next, currentMonth: target });
+                        setBalanceInputs(
+                          Object.fromEntries(next.accounts.map((account: Account) => [account.id, String(account.current)])),
+                        );
                         setMessage("开始录入 " + label(target));
                       }
                     } else await load(target);
@@ -534,8 +550,15 @@ export function LedgerDashboard() {
                               <span>{a.currency === "AUD" ? "$" : "¥"}</span>
                               <input
                                 readOnly={!isEditable || a.name === "消费分期"}
-                                value={a.current}
+                                inputMode="decimal"
+                                value={balanceInputs[a.id] ?? String(a.current)}
                                 onChange={(e) => update(a.id, e.target.value)}
+                                onBlur={() =>
+                                  setBalanceInputs((current) => ({
+                                    ...current,
+                                    [a.id]: String(a.current),
+                                  }))
+                                }
                               />
                             </div>
                           </label>
