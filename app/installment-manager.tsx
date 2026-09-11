@@ -339,7 +339,12 @@ export function MortgageCalculator() {
   useEffect(() => {
     fetch("/api/installments")
       .then((r) => r.json())
-      .then((d) => setM(d.mortgage));
+      .then((d) =>
+        setM({
+          ...d.mortgage,
+          totalLoan: d.mortgage.loanBalance + d.mortgage.offset,
+        }),
+      );
   }, []);
   if (!m)
     return (
@@ -347,14 +352,14 @@ export function MortgageCalculator() {
         <div className="empty-state">正在读取房贷参数…</div>
       </div>
     );
-  let balance = m.totalLoan;
+  let balance = Math.max(0, m.loanBalance);
   const schedule = [];
   for (
     let i = 1;
-    i <= Math.ceil(m.years * 12) && balance - m.offset >= 0;
+    i <= Math.ceil(m.years * 12) && balance > 0;
     i++
   ) {
-    const interest = ((balance - m.offset) * m.annualRate) / 12,
+    const interest = (balance * m.annualRate) / 12,
       payment =
         m.totalMonthlyPayment *
         Math.pow(1 + m.annualPaymentGrowth, Math.floor(i / 12)),
@@ -362,8 +367,12 @@ export function MortgageCalculator() {
     balance -= principal;
     schedule.push({ i, payment, interest, principal, balance });
   }
-  const change = (key: keyof Mortgage, value: number) =>
-    setM({ ...m, [key]: value });
+  const change = (key: keyof Mortgage, value: number) => {
+    const next = { ...m, [key]: Math.max(0, value) };
+    if (key === "loanBalance" || key === "offset")
+      next.totalLoan = next.loanBalance + next.offset;
+    setM(next);
+  };
   const save = async () => {
     const r = await fetch("/api/installments", {
       method: "PATCH",
@@ -388,7 +397,6 @@ export function MortgageCalculator() {
         <div className="mortgage-inputs">
           {(
             [
-              ["totalLoan", "贷款总额"],
               ["annualRate", "年利率"],
               ["years", "年限"],
               ["loanBalance", "当前贷款余额"],
@@ -417,6 +425,19 @@ export function MortgageCalculator() {
               )}
             </label>
           ))}
+        </div>
+        <div className="mortgage-balance-relation">
+          <span>
+            当前贷款余额 <b>${money(m.loanBalance)}</b>
+          </span>
+          <i>+</i>
+          <span>
+            Offset <b>${money(m.offset)}</b>
+          </span>
+          <i>=</i>
+          <span className="effective-balance">
+            贷款总额 <b>${money(m.totalLoan)}</b>
+          </span>
         </div>
         <div className="installment-summary">
           <article>

@@ -15,9 +15,17 @@ test("ships ordered, immutable database migrations", async () => {
 });
 
 test("runs migrations before the production server", async () => {
-  const dockerfile = await read("Dockerfile");
+  const [dockerfile, packageJson, workspace] = await Promise.all([
+    read("Dockerfile"),
+    read("package.json"),
+    read("pnpm-workspace.yaml"),
+  ]);
   assert.match(dockerfile, /COPY --from=build \/app\/db\/migrations/);
   assert.match(dockerfile, /node scripts\/migrate\.mjs && node server\.js/);
+  assert.match(dockerfile, /COPY package\.json pnpm-lock\.yaml pnpm-workspace\.yaml/);
+  assert.match(packageJson, /"packageManager": "pnpm@11\.19\.0"/);
+  for (const dependency of ["esbuild", "sharp", "unrs-resolver", "workerd"])
+    assert.match(workspace, new RegExp(`${dependency}: true`));
 });
 
 test("protects history edits with reversible snapshots", async () => {
@@ -78,4 +86,14 @@ test("keeps decimal input text while editing balances", async () => {
   assert.match(dashboard, /inputMode="decimal"/);
   assert.match(dashboard, /Number\.isFinite/);
   assert.doesNotMatch(dashboard, /current: Number\(value\) \|\| 0/);
+});
+
+test("links mortgage total, current balance, and offset", async () => {
+  const calculator = await read("app/installment-manager.tsx");
+  assert.match(calculator, /totalLoan: d\.mortgage\.loanBalance \+ d\.mortgage\.offset/);
+  assert.match(calculator, /let balance = Math\.max\(0, m\.loanBalance\)/);
+  assert.match(calculator, /interest = \(balance \* m\.annualRate\) \/ 12/);
+  assert.match(calculator, /next\.totalLoan = next\.loanBalance \+ next\.offset/);
+  assert.doesNotMatch(calculator, /\["totalLoan", "贷款总额"\]/);
+  assert.match(calculator, /贷款总额 <b>\$\{money\(m\.totalLoan\)\}<\/b>/);
 });

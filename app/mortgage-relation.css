@@ -1,0 +1,41 @@
+.mortgage-balance-relation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 13px 15px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f7faf8;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.mortgage-balance-relation span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.mortgage-balance-relation b {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.mortgage-balance-relation i {
+  color: #9aa8a1;
+  font-style: normal;
+}
+
+.mortgage-balance-relation .effective-balance {
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #e4f0e9;
+  color: var(--green);
+}
+
+.mortgage-balance-relation .effective-balance b {
+  color: var(--green);
+}
