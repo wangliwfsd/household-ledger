@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { NumericInput } from "./numeric-input";
 type Row = {
   id: number;
   platform: string;
@@ -255,44 +256,41 @@ export function InstallmentManager() {
               </label>
               <label>
                 总本金
-                <input
-                  type="number"
+                <NumericInput
                   value={form.totalPrincipal}
-                  onChange={(e) =>
-                    setForm({ ...form, totalPrincipal: Number(e.target.value) })
+                  onValueChange={(value) =>
+                    setForm({ ...form, totalPrincipal: value })
                   }
                 />
               </label>
               <label>
                 每期本金
-                <input
-                  type="number"
+                <NumericInput
                   value={form.principalPerPeriod}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setForm({
                       ...form,
-                      principalPerPeriod: Number(e.target.value),
+                      principalPerPeriod: value,
                     })
                   }
                 />
               </label>
               <label>
                 每期费用
-                <input
-                  type="number"
+                <NumericInput
                   value={form.feePerPeriod}
-                  onChange={(e) =>
-                    setForm({ ...form, feePerPeriod: Number(e.target.value) })
+                  onValueChange={(value) =>
+                    setForm({ ...form, feePerPeriod: value })
                   }
                 />
               </label>
               <label>
                 总期数
-                <input
-                  type="number"
+                <NumericInput
+                  integer
                   value={form.totalPeriods}
-                  onChange={(e) =>
-                    setForm({ ...form, totalPeriods: Number(e.target.value) })
+                  onValueChange={(value) =>
+                    setForm({ ...form, totalPeriods: value })
                   }
                 />
               </label>
@@ -416,18 +414,18 @@ export function MortgageCalculator() {
             <label key={key}>
               {label}
               {key === "annualRate" || key === "annualPaymentGrowth" ? (
-                <input
-                  type="number"
+                <NumericInput
                   step="0.01"
-                  value={(m[key] * 100).toFixed(2)}
-                  onChange={(e) => change(key, Number(e.target.value) / 100)}
+                  scale={100}
+                  value={m[key]}
+                  onValueChange={(value) => change(key, value)}
                 />
               ) : (
-                <input
-                  type="number"
+                <NumericInput
                   step="0.01"
                   value={m[key]}
-                  onChange={(e) => change(key, Number(e.target.value))}
+                  integer={key === "years"}
+                  onValueChange={(value) => change(key, value)}
                 />
               )}
             </label>

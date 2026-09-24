@@ -5,6 +5,7 @@ import { NetWorthTrend as Trend } from "./net-worth-trend";
 import { HomeCategoryContribution } from "./home-category-contribution";
 import { MonthVersions } from "./month-versions";
 import { AnalysisEnhancements } from "./analysis-enhancements";
+import { NumericInput } from "./numeric-input";
 type Account = {
   id: number;
   name: string;
@@ -255,11 +256,11 @@ export function LedgerDashboard() {
           <div className="header-actions">
             <label>
               汇率 <b>1 AUD =</b>
-              <input
+              <NumericInput
                 disabled={!isCurrent}
                 value={data.rate}
-                onChange={(e) =>
-                  setData({ ...data, rate: Number(e.target.value) || 1 })
+                onValueChange={(value) =>
+                  setData({ ...data, rate: value })
                 }
               />{" "}
               CNY

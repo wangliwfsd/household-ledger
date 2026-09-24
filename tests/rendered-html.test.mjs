@@ -88,6 +88,20 @@ test("keeps decimal input text while editing balances", async () => {
   assert.doesNotMatch(dashboard, /current: Number\(value\) \|\| 0/);
 });
 
+test("keeps all numeric fields editable while values are incomplete", async () => {
+  const [numericInput, dashboard, calculator] = await Promise.all([
+    read("app/numeric-input.tsx"),
+    read("app/ledger-dashboard.tsx"),
+    read("app/installment-manager.tsx"),
+  ]);
+  assert.match(numericInput, /const \[draft, setDraft\]/);
+  assert.match(numericInput, /next === ""/);
+  assert.match(numericInput, /inputMode=\{integer \? "numeric" : "decimal"\}/);
+  assert.match(dashboard, /<NumericInput[\s\S]*value=\{data\.rate\}/);
+  assert.match(calculator, /scale=\{100\}/);
+  assert.doesNotMatch(calculator, /Number\(e\.target\.value\)/);
+});
+
 test("links mortgage total, current balance, and offset", async () => {
   const calculator = await read("app/installment-manager.tsx");
   assert.match(calculator, /totalLoan: d\.mortgage\.loanBalance \+ d\.mortgage\.offset/);
