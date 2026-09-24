@@ -367,6 +367,13 @@ export function MortgageCalculator() {
     balance -= principal;
     schedule.push({ i, payment, interest, principal, balance });
   }
+  const payoffDate = new Date();
+  payoffDate.setDate(1);
+  payoffDate.setMonth(payoffDate.getMonth() + schedule.length);
+  const payoffMonth =
+    balance <= 0
+      ? `${payoffDate.getFullYear()} 年 ${payoffDate.getMonth() + 1} 月`
+      : "超过测算期限";
   const change = (key: keyof Mortgage, value: number) => {
     const next = { ...m, [key]: Math.max(0, value) };
     if (key === "loanBalance" || key === "offset")
@@ -427,14 +434,6 @@ export function MortgageCalculator() {
           ))}
         </div>
         <div className="mortgage-balance-relation">
-          <span>
-            当前贷款余额 <b>${money(m.loanBalance)}</b>
-          </span>
-          <i>+</i>
-          <span>
-            Offset <b>${money(m.offset)}</b>
-          </span>
-          <i>=</i>
           <span className="effective-balance">
             贷款总额 <b>${money(m.totalLoan)}</b>
           </span>
@@ -461,6 +460,7 @@ export function MortgageCalculator() {
             <strong>
               {Math.floor(schedule.length / 12)} 年 {schedule.length % 12} 个月
             </strong>
+            <span className="payoff-month">预计 {payoffMonth}</span>
           </article>
         </div>
         <div className="schedule">

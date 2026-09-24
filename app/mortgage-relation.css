@@ -39,3 +39,10 @@
 .mortgage-balance-relation .effective-balance b {
   color: var(--green);
 }
+
+.payoff-month {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}

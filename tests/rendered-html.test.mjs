@@ -96,4 +96,7 @@ test("links mortgage total, current balance, and offset", async () => {
   assert.match(calculator, /next\.totalLoan = next\.loanBalance \+ next\.offset/);
   assert.doesNotMatch(calculator, /\["totalLoan", "贷款总额"\]/);
   assert.match(calculator, /贷款总额 <b>\$\{money\(m\.totalLoan\)\}<\/b>/);
+  assert.doesNotMatch(calculator, /当前贷款余额 <b>|Offset <b>/);
+  assert.match(calculator, /payoffDate\.setMonth\(payoffDate\.getMonth\(\) \+ schedule\.length\)/);
+  assert.match(calculator, /预计 \{payoffMonth\}/);
 });
